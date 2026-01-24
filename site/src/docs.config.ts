@@ -13,8 +13,11 @@ export const sidebar: Sidebar = [
     sidebarLabel: 'Concepts',
     contents: [
       { slug: 'concepts/architecture' },
+      { slug: 'concepts/presets' },
+      { slug: 'concepts/features' },
       { slug: 'concepts/skins' },
       { slug: 'concepts/ui-components' },
+      { slug: 'concepts/media' },
     ],
   },
   {
