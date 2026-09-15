@@ -1,11 +1,13 @@
 name: Resonances Vivienne TTS Main
 on:
-  issues:
-    types: [opened]
+  push:
+    branches: [main]
+    paths:
+      - '.tmp_resonances/trigger.txt'
+  workflow_dispatch:
 
 jobs:
   tts:
-    if: startsWith(github.event.issue.title, '[RÉSONANCES TTS]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
