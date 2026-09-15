@@ -26,13 +26,17 @@ jobs:
           pitch='+0Hz'
           volume='+0%'
           items=[
-            ('.tmp_resonances/mercredi.txt','mercredi_raw.mp3','RES-Mercredi-Introduction_Vivienne_FINAL.mp3'),
-            ('.tmp_resonances/vendredi.txt','vendredi_raw.mp3','RES-Vendredi-Introduction_Vivienne_FINAL.mp3'),
+            ('.tmp_resonances/mercredi.txt','mercredi_raw.mp3','RES-Mercredi-Introduction_Vivienne_CLOUD_FINAL.mp3'),
+            ('.tmp_resonances/vendredi.txt','vendredi_raw.mp3','RES-Vendredi-Introduction_Vivienne_CLOUD_FINAL.mp3'),
           ]
           async def make(src, raw, final):
               text=pathlib.Path(src).read_text(encoding='utf-8')
               await edge_tts.Communicate(text, voice=voice, rate=rate, pitch=pitch, volume=volume).save(raw)
-              subprocess.run(['ffmpeg','-y','-hide_banner','-loglevel','error','-i',raw,'-ar','48000','-b:a','224k',final], check=True)
+              subprocess.run([
+                  'ffmpeg','-y','-hide_banner','-loglevel','error','-i',raw,
+                  '-af','loudnorm=I=-16:TP=-1:LRA=11,alimiter=limit=0.95',
+                  '-ar','48000','-ac','2','-c:a','libmp3lame','-b:a','256k',final
+              ], check=True)
           async def main():
               for item in items:
                   await make(*item)
@@ -40,16 +44,25 @@ jobs:
           PY
       - name: QA technical
         run: |
-          for f in RES-*-Introduction_Vivienne_FINAL.mp3; do
+          set -e
+          for f in RES-*-Introduction_Vivienne_CLOUD_FINAL.mp3; do
             echo "=== $f ==="
-            ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,bit_rate,channels -of default=nw=1 "$f"
-            ffprobe -v error -show_entries format=duration -of default=nw=1 "$f"
+            codec=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=nw=1:nk=1 "$f")
+            sr=$(ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate -of default=nw=1:nk=1 "$f")
+            ch=$(ffprobe -v error -select_streams a:0 -show_entries stream=channels -of default=nw=1:nk=1 "$f")
+            br=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of default=nw=1:nk=1 "$f")
+            dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$f")
+            echo "codec=$codec sample_rate=$sr channels=$ch bit_rate=$br duration=$dur"
+            test "$codec" = "mp3"
+            test "$sr" = "48000"
+            test "$ch" = "2"
+            test "$br" = "256000"
           done
       - name: Upload audios
         uses: actions/upload-artifact@v4
         with:
-          name: resonances-vivienne-audios
+          name: resonances-vivienne-cloud-final
           path: |
-            RES-Mercredi-Introduction_Vivienne_FINAL.mp3
-            RES-Vendredi-Introduction_Vivienne_FINAL.mp3
+            RES-Mercredi-Introduction_Vivienne_CLOUD_FINAL.mp3
+            RES-Vendredi-Introduction_Vivienne_CLOUD_FINAL.mp3
           retention-days: 1
