@@ -1,0 +1,53 @@
+name: Resonances Vivienne TTS
+on:
+  push:
+    branches: [resonances-vivienne-tts]
+  workflow_dispatch:
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install edge-tts
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Generate audios
+        run: |
+          python - <<'PY'
+          import asyncio, pathlib, subprocess, edge_tts
+          voice='fr-FR-VivienneMultilingualNeural'
+          rate='-29%'
+          pitch='+0Hz'
+          volume='+0%'
+          items=[
+            ('resonances_tts/mercredi.txt','mercredi_raw.mp3','RES-Mercredi-Introduction_Vivienne_FINAL.mp3'),
+            ('resonances_tts/vendredi.txt','vendredi_raw.mp3','RES-Vendredi-Introduction_Vivienne_FINAL.mp3'),
+          ]
+          async def make(src, raw, final):
+              text=pathlib.Path(src).read_text(encoding='utf-8')
+              await edge_tts.Communicate(text, voice=voice, rate=rate, pitch=pitch, volume=volume).save(raw)
+              subprocess.run(['ffmpeg','-y','-hide_banner','-loglevel','error','-i',raw,'-ar','48000','-b:a','224k',final], check=True)
+          async def main():
+              for item in items:
+                  await make(*item)
+          asyncio.run(main())
+          PY
+      - name: QA technical
+        run: |
+          for f in RES-*-Introduction_Vivienne_FINAL.mp3; do
+            echo "=== $f ==="
+            ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,bit_rate,channels -of default=nw=1 "$f"
+            ffprobe -v error -show_entries format=duration -of default=nw=1 "$f"
+          done
+      - name: Upload audios
+        uses: actions/upload-artifact@v4
+        with:
+          name: resonances-vivienne-audios
+          path: |
+            RES-Mercredi-Introduction_Vivienne_FINAL.mp3
+            RES-Vendredi-Introduction_Vivienne_FINAL.mp3
+          retention-days: 1
